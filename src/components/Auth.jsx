@@ -12,7 +12,7 @@ const Auth = ({ isAuthenticated, handleLogin, handleLogout }) => {
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState(null);
 
-  const API_BASE_URL = "https://backfitbite-production.up.railway.app/";
+  const API_BASE_URL = "https://backfitbite-production.up.railway.app";
 
   // Fetch user data when authenticated
   useEffect(() => {
