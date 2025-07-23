@@ -1,6 +1,6 @@
 import React from "react";
 
-const Header = ({ isnAuthenticated, handleLogout }) => {
+const Header = ({ isAuthenticated, handleLogout }) => {
   return (
     <header className="fixed top-0 w-full bg-[#5f6caf] text-white shadow-lg z-50 transition-all duration-300">
       <nav className="container mx-auto flex justify-between items-center py-4 px-6">
