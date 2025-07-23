@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 const Auth = ({ isAuthenticated, handleLogin, handleLogout }) => {
   const [isLoginMode, setIsLoginMode] = useState(true);
@@ -9,6 +9,39 @@ const Auth = ({ isAuthenticated, handleLogin, handleLogout }) => {
     name: "",
   });
   const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState(null);
+
+  const API_BASE_URL = "http://localhost:3000";
+
+  // Fetch user data when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchUserData();
+    }
+  }, [isAuthenticated]);
+
+  const fetchUserData = async () => {
+    try {
+      // Get user ID from localStorage or wherever you store it
+      const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+      const userId = storedUser.id || storedUser._id;
+
+      if (userId) {
+        const response = await fetch(`${API_BASE_URL}/users/${userId}`);
+        if (response.ok) {
+          const userData = await response.json();
+          setUser(userData);
+          // Update localStorage with fresh data
+          localStorage.setItem("user", JSON.stringify(userData));
+        } else {
+          console.error("Failed to fetch user data");
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+    }
+  };
 
   const validateForm = () => {
     const newErrors = {};
@@ -28,12 +61,69 @@ const Auth = ({ isAuthenticated, handleLogin, handleLogout }) => {
     return newErrors;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     const validationErrors = validateForm();
+
     if (Object.keys(validationErrors).length === 0) {
-      handleLogin(form.email, form.password);
-      setForm({ email: "", password: "", confirmPassword: "", name: "" });
+      setLoading(true);
+      setErrors({});
+
+      try {
+        if (isLoginMode) {
+          // Login API call
+          const response = await fetch(`${API_BASE_URL}/users/login`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              email: form.email,
+              password: form.password,
+            }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            localStorage.setItem("user", JSON.stringify(data.user));
+            localStorage.setItem("token", data.token);
+            handleLogin(data.user.email, form.password);
+            setForm({ email: "", password: "", confirmPassword: "", name: "" });
+          } else {
+            const errorData = await response.json();
+            setErrors({ general: errorData.error || "Erreur de connexion" });
+          }
+        } else {
+          // Register API call
+          const response = await fetch(`${API_BASE_URL}/users/register`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              name: form.name,
+              email: form.email,
+              password: form.password,
+            }),
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            localStorage.setItem("user", JSON.stringify(data.user));
+            localStorage.setItem("token", data.token);
+            handleLogin(data.user.email, form.password);
+            setForm({ email: "", password: "", confirmPassword: "", name: "" });
+          } else {
+            const errorData = await response.json();
+            setErrors({ general: errorData.error || "Erreur d'inscription" });
+          }
+        }
+      } catch (error) {
+        setErrors({ general: "Erreur de connexion au serveur" });
+        console.error("Auth error:", error);
+      } finally {
+        setLoading(false);
+      }
     } else {
       setErrors(validationErrors);
     }
@@ -47,8 +137,18 @@ const Auth = ({ isAuthenticated, handleLogin, handleLogout }) => {
     }
   };
 
+  const handleLogoutClick = () => {
+    // Clear user data
+    setUser(null);
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    handleLogout();
+  };
+
   if (isAuthenticated) {
-    const user = JSON.parse(localStorage.getItem("user") || "{}");
+    const displayUser =
+      user || JSON.parse(localStorage.getItem("user") || "{}");
+
     return (
       <section id="auth" className="py-20 bg-white">
         <div className="container mx-auto px-6 text-center">
@@ -60,11 +160,22 @@ const Auth = ({ isAuthenticated, handleLogin, handleLogout }) => {
             <p className="text-gray-600 mb-6">
               Vous êtes connecté en tant que :
             </p>
-            <p className="text-lg font-semibold text-[#ff8364] mb-8">
-              {user.email}
-            </p>
+
+            {/* Display user information */}
+            <div className="mb-6 p-4 bg-white rounded-lg">
+              {displayUser.name && (
+                <p className="text-lg font-semibold text-[#5f6caf] mb-2">
+                  {displayUser.name}
+                </p>
+              )}
+              <p className="text-md text-[#ff8364] mb-2">{displayUser.email}</p>
+              {displayUser._id && (
+                <p className="text-sm text-gray-500">ID: {displayUser._id}</p>
+              )}
+            </div>
+
             <button
-              onClick={handleLogout}
+              onClick={handleLogoutClick}
               className="bg-[#ff8364] text-white px-8 py-3 rounded-lg hover:bg-red-600 transition-colors duration-300 font-semibold"
             >
               Se Déconnecter
@@ -89,7 +200,10 @@ const Auth = ({ isAuthenticated, handleLogin, handleLogout }) => {
           <div className="bg-[#edf7fa] p-8 rounded-xl shadow-lg">
             <div className="flex mb-6">
               <button
-                onClick={() => setIsLoginMode(true)}
+                onClick={() => {
+                  setIsLoginMode(true);
+                  setErrors({});
+                }}
                 className={`flex-1 py-2 px-4 rounded-l-lg font-semibold transition-colors duration-300 ${
                   isLoginMode
                     ? "bg-[#5f6caf] text-white"
@@ -99,7 +213,10 @@ const Auth = ({ isAuthenticated, handleLogin, handleLogout }) => {
                 Connexion
               </button>
               <button
-                onClick={() => setIsLoginMode(false)}
+                onClick={() => {
+                  setIsLoginMode(false);
+                  setErrors({});
+                }}
                 className={`flex-1 py-2 px-4 rounded-r-lg font-semibold transition-colors duration-300 ${
                   !isLoginMode
                     ? "bg-[#5f6caf] text-white"
@@ -109,6 +226,13 @@ const Auth = ({ isAuthenticated, handleLogin, handleLogout }) => {
                 Inscription
               </button>
             </div>
+
+            {/* General error message */}
+            {errors.general && (
+              <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg">
+                {errors.general}
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="space-y-4">
               {!isLoginMode && (
@@ -125,6 +249,7 @@ const Auth = ({ isAuthenticated, handleLogin, handleLogout }) => {
                       errors.name ? "border-red-500" : "border-gray-300"
                     }`}
                     placeholder="Votre nom"
+                    disabled={loading}
                   />
                   {errors.name && (
                     <p className="text-red-500 text-sm mt-1">{errors.name}</p>
@@ -145,6 +270,7 @@ const Auth = ({ isAuthenticated, handleLogin, handleLogout }) => {
                     errors.email ? "border-red-500" : "border-gray-300"
                   }`}
                   placeholder="votre@email.com"
+                  disabled={loading}
                 />
                 {errors.email && (
                   <p className="text-red-500 text-sm mt-1">{errors.email}</p>
@@ -164,6 +290,7 @@ const Auth = ({ isAuthenticated, handleLogin, handleLogout }) => {
                     errors.password ? "border-red-500" : "border-gray-300"
                   }`}
                   placeholder="••••••••"
+                  disabled={loading}
                 />
                 {errors.password && (
                   <p className="text-red-500 text-sm mt-1">{errors.password}</p>
@@ -186,6 +313,7 @@ const Auth = ({ isAuthenticated, handleLogin, handleLogout }) => {
                         : "border-gray-300"
                     }`}
                     placeholder="••••••••"
+                    disabled={loading}
                   />
                   {errors.confirmPassword && (
                     <p className="text-red-500 text-sm mt-1">
@@ -197,9 +325,18 @@ const Auth = ({ isAuthenticated, handleLogin, handleLogout }) => {
 
               <button
                 type="submit"
-                className="w-full bg-[#ff8364] text-white py-3 rounded-lg hover:bg-[#ffb677] transition-colors duration-300 font-semibold"
+                disabled={loading}
+                className={`w-full py-3 rounded-lg font-semibold transition-colors duration-300 ${
+                  loading
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-[#ff8364] hover:bg-[#ffb677]"
+                } text-white`}
               >
-                {isLoginMode ? "Se Connecter" : "S'inscrire"}
+                {loading
+                  ? "Chargement..."
+                  : isLoginMode
+                  ? "Se Connecter"
+                  : "S'inscrire"}
               </button>
             </form>
           </div>
@@ -208,4 +345,5 @@ const Auth = ({ isAuthenticated, handleLogin, handleLogout }) => {
     </section>
   );
 };
+
 export default Auth;
