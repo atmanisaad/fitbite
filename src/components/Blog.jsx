@@ -12,7 +12,7 @@ const Blog = ({ isAuthenticated }) => {
   });
   const [showAddForm, setShowAddForm] = useState(false);
 
-  const API_BASE_URL = "http://localhost:3000";
+  const API_BASE_URL = "https://backfitbite-production.up.railway.app/";
 
   // Fetch articles from API
   const fetchArticles = async () => {
